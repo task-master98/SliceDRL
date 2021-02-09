@@ -1,7 +1,7 @@
 import operator
 import random
 
-from .utils import distance, KDTree
+from utils import distance, KDTree
 
 
 class Client:
