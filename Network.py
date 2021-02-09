@@ -63,10 +63,10 @@ class Network(Env):
     mb_weights = []
       
 
-    def __init__(self, bs_params, client_params):
+    def __init__(self, bs_params, slice_params, client_params):
         self.n_clients = 100
         self.clients = self.clients_init(self.n_clients, client_params) 
-        self.base_stations = self.base_stations_init(bs_params, client_params)
+        self.base_stations = self.base_stations_init(bs_params, slice_params)
         self.x_range = (0, 1000)
         self.y_range = (0, 1000)
         self.stats = Stats(self.base_stations, None, (self.x_range, self.y_range))
@@ -77,6 +77,9 @@ class Network(Env):
                             -0.025, +0.05), (+0.025, +0.025, -0.05)]
         self.action_space = spaces.Discrete(7)
         self.state = None
+        high = np.ones(shape=(9, ))
+        low = -high
+        self.observation_space = spaces.Box(low, high, dtype=np.float32)
         self.seed()
         
         
