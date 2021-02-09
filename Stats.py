@@ -1,8 +1,8 @@
 import numpy as np
 
 class Stats:
-    def __init__(self, env, base_stations, clients, area):
-        self.env = env
+    def __init__(self, base_stations, clients, area):
+        
         self.base_stations = base_stations
         self.clients = clients
         self.area = area
@@ -32,7 +32,7 @@ class Stats:
         )
 
     def collect(self):
-        yield self.env.timeout(0.25)
+        
         self.connect_attempt.append(0)
         self.block_count.append(0)
         self.handover_count.append(0)
@@ -50,7 +50,7 @@ class Stats:
             self.connect_attempt.append(0)
             self.block_count.append(0)
             self.handover_count.append(0)
-            yield self.env.timeout(1)
+            
 
     def get_total_connected_users_ratio(self):
         t, cc = 0, 0

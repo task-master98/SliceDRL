@@ -25,6 +25,7 @@ from gym import Env
 from gym import spaces, logger
 from gym.utils import seeding
 from queue import Queue
+from collections import defaultdict
 
 
 class Network(Env):
@@ -47,24 +48,20 @@ class Network(Env):
         slice 3 allocated bandwidth ratio, slice 3 instantaneous bandwidth usage ratio, slice 3 client density}
     
     Actions:
-        A={(0, 0, 0), (+5%, -2.5%, -2.5%), (-5%, +2.5%,
-        +2.5%), (-2.5%, +5%, -2.5%), (+2.5%, -5%, +2.5%), (-2.5%,
-        -2.5%, +5%), (+2.5%, +2.5%, -5%)}
+        A={(0, 0, 0), (+0.05, -0.025, -0.025), (-0.05, +0.025,
+        +0.025), (-0.025, +0.05, -0.025), (+0.025, -0.05, +0.025), (-0.025,
+        -0.025, +0.05), (+0.025, +0.025, -0.05)}
     
     """
     base_stations = []
     clients = []
-    mobility_patterns = {'car': {'distribution': 'normal', 'params': (0, 7), 'client_weight': 0.1},
-                        'walk': {'distribution': 'randint', 'params': (-1, 1), 'client_wieght': 0.4},
-                        'tram': {'distribution': 'randint', 'params': (-4, 4), 'client_wieght': 0.5}}
+  
     slices_info = {'emBB': 0.45, 'mMTC': 0.3, 'URLLC': 0.25}
     slice_weights = []
     for _, item in slices_info.items():
         slice_weights.append(item)
     mb_weights = []
-    for _, item in mobility_patterns.items():
-        client_wt = item['client_weight']
-        mb_weights.append(client_wt)
+      
 
     def __init__(self, bs_params, client_params):
         self.n_clients = 100
@@ -72,12 +69,22 @@ class Network(Env):
         self.base_stations = self.base_stations_init(bs_params, client_params)
         self.x_range = (0, 1000)
         self.y_range = (0, 1000)
-        self.stats = Stats(Env, self.base_stations, None, (self.x_range, self.y_range))
+        self.stats = Stats(self.base_stations, None, (self.x_range, self.y_range))
         for client in self.clients:
             client.stat_collector = self.stats
+        self.action_list = [(0, 0, 0), (0.05, -0.025, -0.025), (-0.05, +0.025,
+                            +0.025), (-0.025, +0.05, -0.025), (+0.025, -0.05, +0.025), (-0.025,
+                            -0.025, +0.05), (+0.025, +0.025, -0.05)]
+        self.action_space = spaces.Discrete(7)
+        self.state = None
+        self.seed()
         
+        
+    def reset(self):
+        self.state = self.np_random.uniform(low=0, high=1, size=(9,))
+        return self._get_ob()
     
-    def step(self):
+    def step(self, action: int):
         """
         A step is defined in the client
         class which has 4 different parts 
@@ -91,12 +98,60 @@ class Network(Env):
         which provides one observation in the
         form of an array
         """
-        pass
+        ### Initialise the stat collector which gives state information
+        selected_action = self.SelectedAction(action)
+        for bs in self.base_stations:
+            for itr, slice in enumerate(bs.slices):
+                new_s_cap = (1 + selected_action[itr])*slice.init_capacity
+                slice.init_capacity = new_s_cap
+                slice.capacity = Container(init=new_s_cap, capacity=new_s_cap)
 
-    def reset(self):
-        pass
+        self.initialise_stats()
+        selected_clients = self.generate_user_requests()
+        slice_hash_table = defaultdict(list)
+        reward = self.reward(selected_clients)
 
-    def reward(self):
+        total_connected_clients, clients_in_coverage = 0, 0
+        for bs in self.base_stations:
+            for slice in bs.slices:
+                total_connected_clients += slice.connected_clients
+                slice_hash_table[slice.name].append([slice.connected_users/len(selected_clients),
+                                                    (slice.capacity.capacity - slice.capacity.level)/slice.bandwidth_max,
+                                                    slice.capacity.capacity/slice.bandwidth_max])
+        state_array = []
+        for _, item in slice_hash_table.items():
+            state_array.append(item)
+
+        self.state = np.flatten(np.array(state_array))
+        done = total_connected_clients == len(selected_clients)
+
+        return self.state, reward, done, {}
+
+
+                
+        
+    def SelectedAction(self, action: int):
+        action = self.action_space[action]
+        return action
+
+
+
+    def generate_user_requests(self):
+        ## A subset of clients are selected at each step
+        ## this follows a normal distribution
+        n_active_clients = int(random.random()*self.n_clients)
+        random_client_ids = np.random.randint(self.n_clients, size=n_active_clients)
+        all_clients = np.array(self.clients)
+        selected_clients = all_clients[random_client_ids]
+
+        for selected_client in selected_clients:
+            selected_client.iter()
+
+        return selected_clients
+
+      
+    
+    def reward(self, clients: np.ndarray):
         """
         The reward function is defined in the 
         base paper: https://ieeexplore.ieee.org/abstract/document/9235006/references#references
@@ -105,7 +160,18 @@ class Network(Env):
         slice. The net reward is the sum over all the slices. The request counts can be generated
         from the Stats.get_stats() method.
         """
-        pass
+        reward = 0
+        for client in clients:
+            slice: Slice = client.get_slice()
+            stats: Stats = client.stat_collector
+            latency_requirements = 1/slice.delay_tolerance
+            connection_requests = stats.connect_attempt[-1]
+            blocked_requests = connection_requests - slice.connected_users
+            reward_slice = -(latency_requirements)*(blocked_requests/connection_requests)
+            reward += reward_slice
+        return reward
+            
+        
 
     def is_done(self):
         """
@@ -114,9 +180,24 @@ class Network(Env):
         """
         pass
 
+    def connections_init(self):
+        """
+        Initialise connections with  KDTree
+        """
+        KDTree.limit = 5
+        KDTree.run(self.clients, self.base_stations, 0)
+    
+    def initialise_stats(self):
+        """
+        Assigns clients to the stats method
+        only after initialising the KDTree i.e.,
+        only after assigning closest base stations 
+        to all the clients
+        """
+        self.connections_init()
+        self.stats.clients = self.clients
+
         
-
-
     @classmethod
     def base_stations_init(cls, bs_params, slice_params):
         i = 0
@@ -149,15 +230,15 @@ class Network(Env):
         usage_freq_pattern = Distributor(f'ufp', get_dist(ufp['distribution']),
                                         *ufp['params'], divide_scale=ufp['divide_scale'])
 
-        for client in range(n_clients):
+        for _ in range(n_clients):
             loc_x = client_params['location']['x']
             loc_y = client_params['location']['y']
             location_x = get_dist(loc_x['distribution'])(*loc_x['params'])
             location_y = get_dist(loc_y['distribution'])(*loc_y['params'])
-            mobility_pattern = get_random_mobility_pattern(cls.mb_weights, cls.mobility_patterns)
+            
             connected_slice_index = get_random_slice_index(cls.slice_weights)
-            c = Client(i, Env, location_x, location_y, mobility_pattern,
-                        usage_freq_pattern.generator_scaled(), connected_slice_index, None, None)
+            c = Client(i, location_x, location_y, usage_freq_pattern.generator_scaled(),
+                         connected_slice_index, None, None)
             cls.clients.append(c)
             i += 1
 
