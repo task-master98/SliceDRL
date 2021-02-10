@@ -9,15 +9,15 @@ class Stats:
         #self.graph = graph
 
         # Stats
-        self.total_connected_users_ratio = []
-        self.total_used_bw = []
-        self.avg_slice_load_ratio = []
-        self.avg_slice_client_count = []
-        self.coverage_ratio = []
-        self.connect_attempt = []
-        self.block_count = []
-        self.handover_count = []
-        self.user_in_each_slice = []
+        self.total_connected_users_ratio = [0]
+        self.total_used_bw = [0]
+        self.avg_slice_load_ratio = [0]
+        self.avg_slice_client_count = [0]
+        self.coverage_ratio = [0]
+        self.connect_attempt = [0]
+        self.block_count = [0]
+        self.handover_count = [0]
+        self.user_in_each_slice = [0]
     
     def get_stats(self):
         return (
