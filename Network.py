@@ -12,7 +12,7 @@ from Container import Container
 from Coverage import Coverage
 from Distributor import Distributor
 from Stats import Stats 
-from utils import KDTree
+from utils import kdtree
 
 
 
@@ -53,14 +53,14 @@ class Network(Env):
         -0.025, +0.05), (+0.025, +0.025, -0.05)}
     
     """
-    base_stations = []
-    clients = []
-  
+      
     slices_info = {'emBB': 0.45, 'mMTC': 0.3, 'URLLC': 0.25}
-    slice_weights = []
+    collected, slice_weights = 0, []
     for _, item in slices_info.items():
-        slice_weights.append(item)
+        collected += item
+        slice_weights.append(collected)
     mb_weights = []
+    
       
 
     def __init__(self, bs_params, slice_params, client_params):
@@ -72,6 +72,8 @@ class Network(Env):
         self.stats = Stats(self.base_stations, None, (self.x_range, self.y_range))
         for client in self.clients:
             client.stat_collector = self.stats
+        
+        
         self.action_list = [(0, 0, 0), (0.05, -0.025, -0.025), (-0.05, +0.025,
                             +0.025), (-0.025, +0.05, -0.025), (+0.025, -0.05, +0.025), (-0.025,
                             -0.025, +0.05), (+0.025, +0.025, -0.05)]
@@ -81,6 +83,7 @@ class Network(Env):
         low = -high
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
         self.seed()
+        
         
         
     def reset(self):
@@ -117,7 +120,7 @@ class Network(Env):
         total_connected_clients, clients_in_coverage = 0, 0
         for bs in self.base_stations:
             for slice in bs.slices:
-                total_connected_clients += slice.connected_clients
+                total_connected_clients += slice.connected_users
                 slice_hash_table[slice.name].append([slice.connected_users/len(selected_clients),
                                                     (slice.capacity.capacity - slice.capacity.level)/slice.bandwidth_max,
                                                     slice.capacity.capacity/slice.bandwidth_max])
@@ -125,7 +128,7 @@ class Network(Env):
         for _, item in slice_hash_table.items():
             state_array.append(item)
 
-        self.state = np.flatten(np.array(state_array))
+        self.state = (np.array(state_array)).flatten()
         done = total_connected_clients == len(selected_clients)
 
         return self.state, reward, done, {}
@@ -134,7 +137,7 @@ class Network(Env):
                 
         
     def SelectedAction(self, action: int):
-        action = self.action_space[action]
+        action = self.action_list[action]
         return action
 
 
@@ -165,13 +168,14 @@ class Network(Env):
         """
         reward = 0
         for client in clients:
-            slice: Slice = client.get_slice()
-            stats: Stats = client.stat_collector
-            latency_requirements = 1/slice.delay_tolerance
-            connection_requests = stats.connect_attempt[-1]
-            blocked_requests = connection_requests - slice.connected_users
-            reward_slice = -(latency_requirements)*(blocked_requests/connection_requests)
-            reward += reward_slice
+            if client.base_station is not None:
+                slice: Slice = client.base_station.slices[client.subscribed_slice_index]
+                stats: Stats = client.stat_collector
+                latency_requirements = 1/slice.delay_tolerance
+                connection_requests = stats.connect_attempt[-1]
+                blocked_requests = connection_requests - slice.connected_users
+                reward_slice = -(latency_requirements)*(blocked_requests/connection_requests)
+                reward += reward_slice
         return reward
             
         
@@ -187,8 +191,8 @@ class Network(Env):
         """
         Initialise connections with  KDTree
         """
-        KDTree.limit = 5
-        KDTree.run(self.clients, self.base_stations, 0)
+        # self.kdt.limit = 5
+        kdtree(self.clients, self.base_stations)
     
     def initialise_stats(self):
         """
@@ -203,6 +207,7 @@ class Network(Env):
         
     @classmethod
     def base_stations_init(cls, bs_params, slice_params):
+        base_stations = []
         i = 0
         usage_patterns = {}
         for name, s in slice_params.items():
@@ -222,13 +227,15 @@ class Network(Env):
                 s.capacity = Container(init=s_cap, capacity=s_cap)
                 slices.append(s)
             base_station = BaseStation(i, Coverage((bs['x'], bs['y']), bs['coverage']), capacity, slices)
-            cls.base_stations.append(base_station)
+            base_stations.append(base_station)
             i += 1
+        return base_stations
 
             
     @classmethod
     def clients_init(cls, n_clients, client_params):
         i = 0
+        clients = []
         ufp = client_params['usage_frequency']
         usage_freq_pattern = Distributor(f'ufp', get_dist(ufp['distribution']),
                                         *ufp['params'], divide_scale=ufp['divide_scale'])
@@ -240,10 +247,11 @@ class Network(Env):
             location_y = get_dist(loc_y['distribution'])(*loc_y['params'])
             
             connected_slice_index = get_random_slice_index(cls.slice_weights)
-            c = Client(i, location_x, location_y, usage_freq_pattern.generator_scaled(),
+            c = Client(i, location_x, location_y, usage_freq_pattern.generate_scaled(),
                          connected_slice_index, None, None)
-            cls.clients.append(c)
+            clients.append(c)
             i += 1
+        return clients
 
 
 
