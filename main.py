@@ -3,10 +3,10 @@ import gym
 from Network import Network
 
 BS_PARAMS = [{'capacity_bandwidth': 20000000000, 'coverage': 224,
-                'ratio': {'emBB': 0.5, 'mMTC': 0.4, 'URLLC': 0.1},
+                'ratios': {'emBB': 0.5, 'mMTC': 0.4, 'URLLC': 0.1},
                 'x': 500, 'y': 500},
                 {'capacity_bandwidth': 20000000000, 'coverage': 100,
-                'ratio': {'emBB': 0.5, 'mMTC': 0.4, 'URLLC': 0.1},
+                'ratios': {'emBB': 0.5, 'mMTC': 0.4, 'URLLC': 0.1},
                 'x': 100, 'y': 200}]
 
 SLICE_PARAMS = {'emBB': {
@@ -16,7 +16,7 @@ SLICE_PARAMS = {'emBB': {
                 'bandwidth_max': 100000000,
                 'client_weight': 0.45,
                 'threshold': 0,
-                'usage_patter': {'distribution': 'randint', 'params': (4000000, 800000000)}
+                'usage_pattern': {'distribution': 'randint', 'params': (4000000, 800000000)}
                 },
                 'mMTC': {
                 'delay_tolerance': 10,
@@ -25,7 +25,7 @@ SLICE_PARAMS = {'emBB': {
                 'bandwidth_max': 100000000,
                 'client_weight': 0.3,
                 'threshold': 0,
-                'usage_patter': {'distribution': 'randint', 'params': (800000, 8000000)}
+                'usage_pattern': {'distribution': 'randint', 'params': (800000, 8000000)}
                 },
                 'URLLC': {
                 'delay_tolerance': 10,
@@ -34,7 +34,7 @@ SLICE_PARAMS = {'emBB': {
                 'bandwidth_max': 100000000,
                 'client_weight': 0.25,
                 'threshold': 0,
-                'usage_patter': {'distribution': 'randint', 'params': (800, 8000000)}
+                'usage_pattern': {'distribution': 'randint', 'params': (800, 8000000)}
                 }}
 
 CLIENT_PARAMS = {'location':{'x': {'distribution': 'randint', 'params': (0, 1000)}, 'y': {'distribution': 'randint', 'params': (0, 1000)}}
@@ -45,4 +45,4 @@ if __name__ == "__main__":
     nw = Network(bs_params=BS_PARAMS, slice_params=SLICE_PARAMS, client_params=CLIENT_PARAMS)
     for episode in range(100):
         state, reward, done, info = nw.step(nw.action_space.sample())
-        print(state)
+        print(reward)        ## TODO: change the get_random_slice_index method in the Network.py
