@@ -82,13 +82,17 @@ class Network(Env):
         high = np.ones(shape=(9, ))
         low = -high
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
+        self.steps_beyond_done = None
         self.seed()
         
-        
-        
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]    
+    
     def reset(self):
         self.state = self.np_random.uniform(low=0, high=1, size=(9,))
-        return self._get_ob()
+        self.steps_beyond_done = None
+        return np.array(self.state)
     
     def step(self, action: int):
         """
@@ -129,13 +133,28 @@ class Network(Env):
             state_array.append(item)
 
         self.state = (np.array(state_array)).flatten()
-        done = total_connected_clients == len(selected_clients)
+        done = total_connected_clients == len(selected_clients)     ## TODO: done condition is too harsh! Should add used bandwidth condition
 
-        return self.state, reward, done, {}
+        if not done:
+            reward = -10
+        elif self.steps_beyond_done is None:
+            self.steps_beyond_done = 0
+            reward = -10
+        else:
+            if self.steps_beyond_done == 0:
+                logger.warn(
+                    "You are calling 'step()' even though this "
+                    "environment has already returned done = True. You "
+                    "should always call 'reset()' once you receive 'done = "
+                    "True' -- any further steps are undefined behavior.")
+                self.steps_beyond_done += 1
+                reward = 0.0
+                
+
+        return self.state, selected_action, reward, done, {}
 
 
                 
-        
     def SelectedAction(self, action: int):
         action = self.action_list[action]
         return action
@@ -145,7 +164,8 @@ class Network(Env):
     def generate_user_requests(self):
         ## A subset of clients are selected at each step
         ## this follows a normal distribution
-        n_active_clients = int(random.random()*self.n_clients)
+        n_active_clients = max(int(random.random()*self.n_clients), int(0.1*self.n_clients))
+        
         random_client_ids = np.random.randint(self.n_clients, size=n_active_clients)
         all_clients = np.array(self.clients)
         selected_clients = all_clients[random_client_ids]
