@@ -83,6 +83,7 @@ class Network(Env):
         low = -high
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
         self.steps_beyond_done = None
+        self.user_thresold = 0.7
         self.seed()
         
     def seed(self, seed=None):
@@ -125,6 +126,7 @@ class Network(Env):
         for bs in self.base_stations:
             for slice in bs.slices:
                 total_connected_clients += slice.connected_users
+                
                 slice_hash_table[slice.name].append([slice.connected_users/len(selected_clients),
                                                     (slice.capacity.capacity - slice.capacity.level)/slice.bandwidth_max,
                                                     slice.capacity.capacity/slice.bandwidth_max])
@@ -133,7 +135,8 @@ class Network(Env):
             state_array.append(item)
 
         self.state = (np.array(state_array)).flatten()
-        done = total_connected_clients == len(selected_clients)     ## TODO: done condition is too harsh! Should add used bandwidth condition
+        done = bool(total_connected_clients == len(selected_clients)
+                or total_connected_clients/len(selected_clients) >= self.user_thresold)     ## TODO: done condition is too harsh! Should add used bandwidth condition
 
         if not done:
             reward = -10
