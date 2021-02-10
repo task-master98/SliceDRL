@@ -41,8 +41,19 @@ CLIENT_PARAMS = {'location':{'x': {'distribution': 'randint', 'params': (0, 1000
                 , 'usage_frequency': {'distribution': 'randint', 'params': (0, 100000), 'divide_scale': 1000000}}
 NUM_CLIENTS = 1000
 
+def log_all_info(file_name: str, *state_action):
+    f = open(file_name, "a")
+    msg = "State: {}, Action: {}, Reward: {}, Done: {}".format((*state_action))
+    f.write(msg)
+    f.close()
+
+
 if __name__ == "__main__":
     nw = Network(bs_params=BS_PARAMS, slice_params=SLICE_PARAMS, client_params=CLIENT_PARAMS)
+    nw.reset()
+    file_name = "Output.txt"
     for episode in range(100):
-        state, reward, done, info = nw.step(nw.action_space.sample())
-        print(reward)        ## TODO: change the get_random_slice_index method in the Network.py
+        state, action, reward, done, info = nw.step(nw.action_space.sample())
+        log_all_info(file_name, state, action, reward, done)
+        
+               
