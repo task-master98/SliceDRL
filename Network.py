@@ -111,12 +111,17 @@ class Network(Env):
         """
         ### Initialise the stat collector which gives state information
         selected_action = self.SelectedAction(action)
+
+        ## Changing the slice ratios in all base stations as per the action provided
         for bs in self.base_stations:
             for itr, slice in enumerate(bs.slices):
                 new_s_cap = (1 + selected_action[itr])*slice.init_capacity
                 slice.init_capacity = new_s_cap
                 slice.capacity = Container(init=new_s_cap, capacity=new_s_cap)
 
+        
+        ## Connecting base stations to clients and initialising 
+        ## clients attributes of stats
         self.initialise_stats()
         selected_clients = self.generate_user_requests()
         slice_hash_table = defaultdict(list)
