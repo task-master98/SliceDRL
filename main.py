@@ -2,12 +2,10 @@ import numpy as np
 import gym
 from Network import Network
 
-BS_PARAMS = [{'capacity_bandwidth': 20000000000, 'coverage': 224,
+BS_PARAMS = [{'capacity_bandwidth': 20000000000, 'coverage': 500,
                 'ratios': {'emBB': 0.5, 'mMTC': 0.4, 'URLLC': 0.1},
-                'x': 500, 'y': 500},
-                {'capacity_bandwidth': 20000000000, 'coverage': 100,
-                'ratios': {'emBB': 0.5, 'mMTC': 0.4, 'URLLC': 0.1},
-                'x': 100, 'y': 200}]
+                'x': 500, 'y': 500}
+                ]
 
 SLICE_PARAMS = {'emBB': {
                 'delay_tolerance': 10,
